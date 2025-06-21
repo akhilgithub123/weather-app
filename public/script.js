@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     output.textContent = 'Loading...';
     try {
       const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`);
+      
       const data = await res.json();
       if (data.cod !== 200) {
         output.textContent = 'City not found.';
@@ -50,17 +51,65 @@ document.addEventListener('DOMContentLoaded', () => {
         <p>🌇 Humidity: ${data.main.humidity}%</p>
       `;
       saveRecentCity(data.name);
+      await fetchForecast(city);
+
     } catch (err) {
       output.textContent = 'Error fetching weather.';
     }
   }
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const city = input.value.trim();
-    if (!city) return;
-    fetchWeather(city);
-  });
+  async function fetchForecast(city) {
+  try {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
+    );
+    const data = await res.json();
+
+    if (data.cod !== "200") {
+      console.error("Error loading forecast:", data.message);
+      return;
+    }
+
+    const daily = {};
+    data.list.forEach(item => {
+      const date = item.dt_txt.split(" ")[0];
+      const hour = item.dt_txt.split(" ")[1];
+      if (hour === "12:00:00" && !daily[date]) {
+        daily[date] = item;
+      }
+    });
+
+    const forecastHTML = `
+      <h3 class="mt-6 text-lg font-bold text-left">5-Day Forecast</h3>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-2 text-sm">
+        ${Object.values(daily).map(day => `
+          <div class="p-4 bg-gray-100 rounded text-center">
+            <p class="font-semibold">${new Date(day.dt_txt).toLocaleDateString()}</p>
+            <p>🌡️ ${Math.round(day.main.temp)}°C</p>
+            <p class="capitalize">${day.weather[0].description}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    output.innerHTML += forecastHTML;
+  } catch (err) {
+    console.error("Forecast error:", err);
+  }
+}
+
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const city = input.value.trim();
+  if (!city) {
+    output.innerHTML = '<p class="text-red-600">Please enter a city name.</p>';
+    return;
+  }
+  fetchWeather(city);
+  fetchForecast(city);
+});
+
 
   locationBtn.addEventListener('click', () => {
     if (navigator.geolocation) {
